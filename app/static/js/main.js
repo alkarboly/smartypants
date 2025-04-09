@@ -44,7 +44,7 @@ function initMap() {
     // Initialize the map
     map = new maplibregl.Map({
         container: 'map',
-        style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+        style: 'https://demotiles.maplibre.org/style.json', // Free MapLibre demo tiles that don't require an API key
         center: vaCenter,
         zoom: defaultZoom,
         attributionControl: true

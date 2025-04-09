@@ -9,4 +9,7 @@ services:
         value: 3.9.0
     healthCheckPath: /
     plan: free
-    autoDeploy: true 
+    autoDeploy: true
+    repo: https://github.com/yourusername/virginia-crash-visualizer # Replace with your actual repo URL
+    branch: main
+    description: Interactive visualization of vehicle and pedestrian crash data in Virginia 

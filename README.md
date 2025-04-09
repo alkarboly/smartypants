@@ -50,6 +50,21 @@ An interactive web application for visualizing vehicle and pedestrian crash data
 
 4. Open your browser and navigate to `http://localhost:5000`
 
+### Map Styling Options
+
+The application uses free MapLibre demo tiles by default, which don't require an API key. If you want to use a different map style:
+
+1. Open `app/static/js/main.js`
+2. Find the map initialization code (around line 45)
+3. Change the `style` URL to one of these options:
+   - Continue using free tiles: `'https://demotiles.maplibre.org/style.json'`
+   - Use MapTiler (requires free API key): `'https://api.maptiler.com/maps/streets/style.json?key=YOUR_API_KEY'`
+   - Use Mapbox (requires free API key): `'https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/256/{z}/{x}/{y}@2x?access_token=YOUR_API_KEY'`
+
+To get a free API key:
+- MapTiler: Sign up at [MapTiler Cloud](https://cloud.maptiler.com/auth/signup/)
+- Mapbox: Sign up at [Mapbox](https://account.mapbox.com/auth/signup/)
+
 ## Deployment
 
 ### Deploy to Render
