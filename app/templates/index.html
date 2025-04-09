@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virginia Crash Data Visualizer</title>
+    
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <!-- Mapbox GL Draw - use specific version to avoid compatibility issues -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.css" type="text/css">
+    
+    <!-- Turf.js -->
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Virginia Crash Data Visualizer</h1>
+        <p>Draw a quadrilateral (4 points) on the map to visualize crash data in that area</p>
+    </header>
+    
+    <main>
+        <div id="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button id="clear-btn">Clear Selection</button>
+            </div>
+        </div>
+        
+        <div id="charts-container">
+            <div class="chart-box">
+                <h3>Pedestrian Crashes by Year</h3>
+                <canvas id="pedestrianChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Vehicular Crashes by Year</h3>
+                <canvas id="vehicleChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Total Crashes by Type</h3>
+                <canvas id="typesChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Severity and Injuries</h3>
+                <canvas id="severityChart"></canvas>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <p>Virginia Crash Data Visualizer &copy; 2024</p>
+    </footer>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/quadpoly.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 
