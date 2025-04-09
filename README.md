@@ -11,6 +11,12 @@ An interactive web application for visualizing vehicle and pedestrian crash data
   - Vehicular crashes by year
   - Total crashes by type
   - Severity and injury/fatality statistics
+- Dashboard metrics showing key statistics:
+  - Total crashes
+  - Fatal crashes
+  - Injury crashes
+  - Pedestrian injuries & fatalities
+  - Bicycle crashes
 
 ## Tech Stack
 
@@ -46,14 +52,31 @@ An interactive web application for visualizing vehicle and pedestrian crash data
 
 ## Deployment
 
-This application is configured for deployment on Render.com. Follow these steps:
+### Deploy to Render
+
+This application is configured for easy deployment on Render.com using either of the following methods:
+
+#### Method 1: Use the Dashboard UI
 
 1. Create a new Web Service on Render
-2. Connect your repository
+2. Connect your GitHub repository
 3. Use the following settings:
    - Environment: Python
    - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app`
+   - Start Command: `gunicorn -c gunicorn.conf.py wsgi:app`
+   - Select appropriate Python version (3.9+)
+
+#### Method 2: Use render.yaml (Infrastructure as Code)
+
+1. Push all files to your GitHub repository, including `render.yaml`
+2. Log in to Render dashboard
+3. Click on "New" and select "Blueprint"
+4. Connect to your repository
+5. Render will automatically detect the render.yaml file and configure the service accordingly
+
+### Environmental Variables
+
+No special environment variables are required for basic functionality.
 
 ## Data Source
 
