@@ -5,27 +5,67 @@ let draw;
 let map;
 let charts = {
     pedestrian: null,
-    vehicle: null,
-    types: null,
-    severity: null
+    monthly: null,  // Changed from vehicle
+    daynight: null, // Changed from types
+    severity: null,
+    intersection: null,
+    metricsTrend: null,
+    pedestrianAction: null,
+    trafficControl: null,
+    motorcycle: null
 };
 let quadMode;
+
+// Common chart options for better layout
+const commonChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: {
+        padding: {
+            left: 10,
+            right: 15,
+            top: 10,
+            bottom: 10
+        }
+    },
+    plugins: {
+        legend: {
+            labels: {
+                boxWidth: 12,
+                font: {
+                    size: 10
+                }
+            }
+        }
+    }
+};
 
 // Fetch crash data from the API
 async function fetchCrashData() {
     try {
         const response = await fetch('/api/data');
         if (!response.ok) {
-            throw new Error('Failed to fetch crash data');
+            throw new Error(`Failed to fetch crash data: ${response.status} ${response.statusText}`);
         }
-        crashData = await response.json();
-        console.log('Crash data loaded:', crashData.length, 'records');
         
-        // Initialize metrics with all data
-        updateMetrics(crashData);
+        try {
+            crashData = await response.json();
+            console.log('Crash data loaded:', crashData.length, 'records');
+            
+            // Initialize metrics with all data
+            updateMetrics(crashData);
+        } catch (jsonError) {
+            console.error('Error parsing JSON:', jsonError);
+            
+            // Try to get the response text to see what went wrong
+            const responseText = await response.text();
+            console.error('Raw response:', responseText.substring(0, 500) + '...');
+            
+            alert('Error parsing data from server. See console for details.');
+        }
     } catch (error) {
         console.error('Error fetching crash data:', error);
-        alert('Failed to load crash data. Please try again later.');
+        alert(`Failed to load crash data: ${error.message}`);
     }
 }
 
@@ -689,22 +729,129 @@ function initCharts(data) {
     // Initialize pedestrian crashes by year chart
     updatePedestrianChart(data);
     
-    // Initialize vehicle crashes by year chart
-    updateVehicleChart(data);
+    // Initialize monthly crashes chart (replacing vehicle crashes by year)
+    updateMonthlyChart(data);
     
-    // Initialize total crashes by type chart
-    updateTypesChart(data);
+    // Initialize day/night chart (replacing total crashes by type)
+    updateDayNightChart(data);
     
     // Initialize severity and injuries chart
     updateSeverityChart(data);
+    
+    // Initialize intersection type chart
+    updateIntersectionChart(data);
+    
+    // Initialize metrics trend chart
+    updateMetricsTrendChart(data);
+    
+    // Initialize pedestrian action chart
+    updatePedestrianActionChart(data);
+    
+    // Initialize traffic control type chart
+    updateTrafficControlChart(data);
+    
+    // Initialize motorcycle crashes by action chart
+    updateMotorcycleChart(data);
 }
 
 // Update all charts with filtered data
 function updateCharts(data) {
     updatePedestrianChart(data);
-    updateVehicleChart(data);
-    updateTypesChart(data);
+    updateMonthlyChart(data);
+    updateDayNightChart(data);
     updateSeverityChart(data);
+    updateIntersectionChart(data);
+    updateMetricsTrendChart(data);
+    updatePedestrianActionChart(data);
+    updateTrafficControlChart(data);
+    updateMotorcycleChart(data);
+}
+
+// Update motorcycle crashes by action chart
+function updateMotorcycleChart(data) {
+    const ctx = document.getElementById('motorcycleChart').getContext('2d');
+    
+    // Filter motorcycle data
+    const motorcycleData = data.filter(crash => crash.crash_type === 'motorcycle');
+    
+    // Count crashes by motorcycle action category
+    const actionCounts = {};
+    motorcycleData.forEach(crash => {
+        let action = crash.motorcycle_action || 'Unknown';
+        actionCounts[action] = (actionCounts[action] || 0) + 1;
+    });
+    
+    // Sort by count (descending) and take top 5 types, group others
+    const sortedActions = Object.keys(actionCounts)
+        .sort((a, b) => actionCounts[b] - actionCounts[a]);
+    
+    let labels = [];
+    let counts = [];
+    let colors = ['#3388FF', '#FF5533', '#33CC99', '#FF9900', '#9966CC', '#6699CC', '#FF6699'];
+    
+    if (sortedActions.length <= 7) {
+        labels = sortedActions;
+        counts = labels.map(action => actionCounts[action]);
+    } else {
+        // Take top 6 and group others
+        labels = sortedActions.slice(0, 6);
+        counts = labels.map(action => actionCounts[action]);
+        
+        // Sum the rest as "Other"
+        const otherSum = sortedActions.slice(6).reduce((sum, action) => sum + actionCounts[action], 0);
+        labels.push('Other');
+        counts.push(otherSum);
+        colors.push('#999999');
+    }
+    
+    // Destroy previous chart if it exists
+    if (charts.motorcycle) {
+        charts.motorcycle.destroy();
+    }
+    
+    // Create new chart
+    charts.motorcycle = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            plugins: {
+                ...commonChartOptions.plugins,
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Motorcycle Crashes by Action',
+                    font: {
+                        size: 11
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Update pedestrian crashes by year chart
@@ -748,120 +895,197 @@ function updatePedestrianChart(data) {
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            ...commonChartOptions,
             scales: {
                 y: {
                     beginAtZero: true,
                     suggestedMax: maxCount + Math.ceil(maxCount * 0.1), // Add 10% padding
                     ticks: {
                         precision: 0,
-                        stepSize: Math.max(1, Math.ceil(maxCount / 5)) // At most 5 ticks
+                        stepSize: Math.max(1, Math.ceil(maxCount / 5)), // At most 5 ticks
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 9
+                        }
                     }
                 }
             },
             plugins: {
+                ...commonChartOptions.plugins,
                 title: {
                     display: true,
-                    text: `Pedestrian Crashes (${pedestrianData.length} total)`
+                    text: `Pedestrian Crashes (${pedestrianData.length} total)`,
+                    font: {
+                        size: 11
+                    }
                 }
             }
         }
     });
 }
 
-// Update vehicle crashes by year chart
-function updateVehicleChart(data) {
-    const ctx = document.getElementById('vehicleChart').getContext('2d');
+// Update monthly crashes chart (replaces vehicle crashes by year)
+function updateMonthlyChart(data) {
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
     
-    // Filter vehicle crashes
-    const vehicleData = data.filter(crash => crash.crash_type === 'vehicle');
+    // Define all months in order
+    const allMonths = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
     
-    // Group by year
-    const yearCounts = {};
-    vehicleData.forEach(crash => {
-        const year = crash.year;
-        yearCounts[year] = (yearCounts[year] || 0) + 1;
+    // Initialize counts for each month
+    const monthCounts = {};
+    allMonths.forEach(month => {
+        monthCounts[month] = 0;
     });
     
-    const years = Object.keys(yearCounts).sort();
-    const counts = years.map(year => yearCounts[year]);
+    // Count crashes by month
+    data.forEach(crash => {
+        if (crash.month && typeof crash.month === 'string') {
+            const monthName = crash.month.trim();
+            if (allMonths.includes(monthName)) {
+                monthCounts[monthName]++;
+            }
+        }
+    });
+    
+    // Prepare data in correct order
+    const counts = allMonths.map(month => monthCounts[month]);
     
     // Find max count for y-axis scaling
     const maxCount = Math.max(...counts, 1);  // Use at least 1 to avoid empty charts
     
+    // Log the month counts for debugging
+    console.log('Month counts:', monthCounts);
+    
     // Destroy previous chart if it exists
-    if (charts.vehicle) {
-        charts.vehicle.destroy();
+    if (charts.monthly) {
+        charts.monthly.destroy();
     }
     
     // Create new chart
-    charts.vehicle = new Chart(ctx, {
-        type: 'line',
+    charts.monthly = new Chart(ctx, {
+        type: 'bar',
         data: {
-            labels: years,
+            labels: allMonths,
             datasets: [{
-                label: 'Vehicle Crashes',
+                label: 'Crashes by Month',
                 data: counts,
-                borderColor: '#FF5533',
-                backgroundColor: 'rgba(255, 85, 51, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.1
+                backgroundColor: [
+                    '#4D94FF', // January
+                    '#4D94FF', // February
+                    '#76DB94', // March
+                    '#76DB94', // April
+                    '#76DB94', // May
+                    '#FFC861', // June
+                    '#FFC861', // July
+                    '#FFC861', // August
+                    '#F29D62', // September
+                    '#F29D62', // October
+                    '#F29D62', // November
+                    '#4D94FF'  // December
+                ],
+                borderColor: 'rgba(0, 0, 0, 0.1)',
+                borderWidth: 1,
+                barPercentage: 0.8,
+                categoryPercentage: 0.9
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            ...commonChartOptions,
             scales: {
                 y: {
                     beginAtZero: true,
                     suggestedMax: maxCount + Math.ceil(maxCount * 0.1), // Add 10% padding
                     ticks: {
                         precision: 0,
-                        stepSize: Math.max(1, Math.ceil(maxCount / 5)) // At most 5 ticks
+                        stepSize: Math.max(1, Math.ceil(maxCount / 5)), // At most 5 ticks
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 8
+                        },
+                        maxRotation: 45,
+                        minRotation: 45
                     }
                 }
             },
             plugins: {
+                legend: {
+                    display: false
+                },
                 title: {
                     display: true,
-                    text: `Vehicle Crashes (${vehicleData.length} total)`
+                    text: `Crashes by Month (${data.length} total)`,
+                    font: {
+                        size: 11
+                    }
                 }
             }
         }
     });
 }
 
-// Update total crashes by type chart
-function updateTypesChart(data) {
-    const ctx = document.getElementById('typesChart').getContext('2d');
+// Update day vs night chart (replaces total crashes by type)
+function updateDayNightChart(data) {
+    const ctx = document.getElementById('daynightChart').getContext('2d');
     
-    // Count crashes by type
-    const pedestrianCount = data.filter(crash => crash.crash_type === 'pedestrian').length;
-    const vehicleCount = data.filter(crash => crash.crash_type === 'vehicle').length;
+    // Count crashes by day/night
+    const dayCrashes = data.filter(crash => crash.day_night === 'Daytime' || crash.day_night === 'Day').length;
+    const nightCrashes = data.filter(crash => crash.day_night === 'Nighttime' || crash.day_night === 'Night').length;
+    const unknownCrashes = data.filter(crash => !['Daytime', 'Nighttime', 'Day', 'Night'].includes(crash.day_night)).length;
+    
+    // Prepare data array
+    const labels = ['Daytime', 'Nighttime'];
+    const counts = [dayCrashes, nightCrashes];
+    const colors = ['#FFD700', '#3A3B98']; // Yellow for day, dark blue for night
+    
+    // Add unknown if there are any
+    if (unknownCrashes > 0) {
+        labels.push('Unknown');
+        counts.push(unknownCrashes);
+        colors.push('#CCCCCC');
+    }
     
     // Destroy previous chart if it exists
-    if (charts.types) {
-        charts.types.destroy();
+    if (charts.daynight) {
+        charts.daynight.destroy();
     }
     
     // Create new chart
-    charts.types = new Chart(ctx, {
+    charts.daynight = new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: ['Pedestrian', 'Vehicle'],
+            labels: labels,
             datasets: [{
-                data: [pedestrianCount, vehicleCount],
-                backgroundColor: ['#3388FF', '#FF5533']
+                data: counts,
+                backgroundColor: colors,
+                borderColor: 'white',
+                borderWidth: 1
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            ...commonChartOptions,
             plugins: {
+                ...commonChartOptions.plugins,
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: 10
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -876,7 +1100,10 @@ function updateTypesChart(data) {
                 },
                 title: {
                     display: true,
-                    text: `Crash Types (${data.length} total)`
+                    text: 'Daytime vs. Nighttime Crashes',
+                    font: {
+                        size: 11
+                    }
                 }
             }
         }
@@ -995,6 +1222,397 @@ function updateSeverityChart(data) {
     });
 }
 
+// Update intersection type chart
+function updateIntersectionChart(data) {
+    const ctx = document.getElementById('intersectionChart').getContext('2d');
+    
+    // Count crashes by intersection type
+    const intersectionCounts = {};
+    data.forEach(crash => {
+        const type = crash.intersection_type || 'Unknown';
+        intersectionCounts[type] = (intersectionCounts[type] || 0) + 1;
+    });
+    
+    // Sort by count (descending) and take top 5 types, group others
+    const sortedTypes = Object.keys(intersectionCounts)
+        .sort((a, b) => intersectionCounts[b] - intersectionCounts[a]);
+    
+    let labels = [];
+    let counts = [];
+    let colors = ['#3388FF', '#FF5533', '#33CC99', '#FF9900', '#9966CC'];
+    
+    if (sortedTypes.length <= 5) {
+        labels = sortedTypes;
+        counts = labels.map(type => intersectionCounts[type]);
+    } else {
+        // Take top 4 and group others
+        labels = sortedTypes.slice(0, 4);
+        counts = labels.map(type => intersectionCounts[type]);
+        
+        // Sum the rest as "Other"
+        const otherSum = sortedTypes.slice(4).reduce((sum, type) => sum + intersectionCounts[type], 0);
+        labels.push('Other');
+        counts.push(otherSum);
+        colors.push('#999999');
+    }
+    
+    // Destroy previous chart if it exists
+    if (charts.intersection) {
+        charts.intersection.destroy();
+    }
+    
+    // Create new chart
+    charts.intersection = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            plugins: {
+                ...commonChartOptions.plugins,
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Crashes by Intersection Type',
+                    font: {
+                        size: 11
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update metrics trend chart
+function updateMetricsTrendChart(data) {
+    const ctx = document.getElementById('metricsTrendChart').getContext('2d');
+    
+    // Group metrics by year
+    const yearMetrics = {};
+    
+    // Initialize all years
+    const years = [...new Set(data.map(crash => crash.year))].sort();
+    years.forEach(year => {
+        yearMetrics[year] = {
+            totalCrashes: 0,
+            fatalCrashes: 0,
+            injuryCrashes: 0,
+            pedestrianInjuries: 0,
+            pedestrianFatalities: 0
+        };
+    });
+    
+    // Populate metrics for each year
+    years.forEach(year => {
+        const yearData = data.filter(crash => crash.year === year);
+        
+        yearMetrics[year].totalCrashes = yearData.length;
+        yearMetrics[year].fatalCrashes = yearData.filter(crash => parseInt(crash.fatalities || 0) > 0).length;
+        yearMetrics[year].injuryCrashes = yearData.filter(crash => parseInt(crash.injuries || 0) > 0).length;
+        
+        const pedestrianData = yearData.filter(crash => crash.crash_type === 'pedestrian');
+        yearMetrics[year].pedestrianInjuries = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.injuries || 0), 0);
+        yearMetrics[year].pedestrianFatalities = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
+    });
+    
+    // Prepare datasets
+    const datasets = [
+        {
+            label: 'Total Crashes',
+            data: years.map(year => yearMetrics[year].totalCrashes),
+            borderColor: '#3388FF',
+            backgroundColor: 'rgba(51, 136, 255, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+        },
+        {
+            label: 'Fatal Crashes',
+            data: years.map(year => yearMetrics[year].fatalCrashes),
+            borderColor: '#FF5533',
+            backgroundColor: 'rgba(255, 85, 51, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+        },
+        {
+            label: 'Injury Crashes',
+            data: years.map(year => yearMetrics[year].injuryCrashes),
+            borderColor: '#33CC99',
+            backgroundColor: 'rgba(51, 204, 153, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+        },
+        {
+            label: 'Pedestrian Injuries',
+            data: years.map(year => yearMetrics[year].pedestrianInjuries),
+            borderColor: '#FF9900',
+            backgroundColor: 'rgba(255, 153, 0, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+        },
+        {
+            label: 'Pedestrian Fatalities',
+            data: years.map(year => yearMetrics[year].pedestrianFatalities),
+            borderColor: '#9966CC',
+            backgroundColor: 'rgba(153, 102, 204, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+        }
+    ];
+    
+    // Destroy previous chart if it exists
+    if (charts.metricsTrend) {
+        charts.metricsTrend.destroy();
+    }
+    
+    // Create new chart
+    charts.metricsTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: datasets
+        },
+        options: {
+            ...commonChartOptions,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                }
+            },
+            plugins: {
+                ...commonChartOptions.plugins,
+                title: {
+                    display: true,
+                    text: 'Metrics Trend by Year',
+                    font: {
+                        size: 11
+                    }
+                },
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 10,
+                        font: {
+                            size: 8
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update pedestrian action category chart
+function updatePedestrianActionChart(data) {
+    const ctx = document.getElementById('pedestrianActionChart').getContext('2d');
+    
+    // Filter pedestrian data
+    const pedestrianData = data.filter(crash => crash.crash_type === 'pedestrian');
+    
+    // Count crashes by pedestrian action category
+    const actionCounts = {};
+    pedestrianData.forEach(crash => {
+        const action = crash.pedestrian_action || 'Unknown';
+        actionCounts[action] = (actionCounts[action] || 0) + 1;
+    });
+    
+    // Sort by count (descending) and take top 5 types, group others
+    const sortedActions = Object.keys(actionCounts)
+        .sort((a, b) => actionCounts[b] - actionCounts[a]);
+    
+    let labels = [];
+    let counts = [];
+    let colors = ['#3388FF', '#FF5533', '#33CC99', '#FF9900', '#9966CC', '#6699CC', '#FF6699'];
+    
+    if (sortedActions.length <= 7) {
+        labels = sortedActions;
+        counts = labels.map(action => actionCounts[action]);
+    } else {
+        // Take top 6 and group others
+        labels = sortedActions.slice(0, 6);
+        counts = labels.map(action => actionCounts[action]);
+        
+        // Sum the rest as "Other"
+        const otherSum = sortedActions.slice(6).reduce((sum, action) => sum + actionCounts[action], 0);
+        labels.push('Other');
+        counts.push(otherSum);
+        colors.push('#999999');
+    }
+    
+    // Destroy previous chart if it exists
+    if (charts.pedestrianAction) {
+        charts.pedestrianAction.destroy();
+    }
+    
+    // Create new chart
+    charts.pedestrianAction = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            plugins: {
+                ...commonChartOptions.plugins,
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Pedestrian Actions',
+                    font: {
+                        size: 11
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update traffic control type chart
+function updateTrafficControlChart(data) {
+    const ctx = document.getElementById('trafficControlChart').getContext('2d');
+    
+    // Count crashes by traffic control type
+    const controlCounts = {};
+    data.forEach(crash => {
+        const control = crash.traffic_control || 'Unknown';
+        controlCounts[control] = (controlCounts[control] || 0) + 1;
+    });
+    
+    // Sort by count (descending) and take top types, group others
+    const sortedControls = Object.keys(controlCounts)
+        .sort((a, b) => controlCounts[b] - controlCounts[a]);
+    
+    let labels = [];
+    let counts = [];
+    let colors = ['#3388FF', '#FF5533', '#33CC99', '#FF9900', '#9966CC', '#6699CC', '#FF6699'];
+    
+    if (sortedControls.length <= 7) {
+        labels = sortedControls;
+        counts = labels.map(control => controlCounts[control]);
+    } else {
+        // Take top 6 and group others
+        labels = sortedControls.slice(0, 6);
+        counts = labels.map(control => controlCounts[control]);
+        
+        // Sum the rest as "Other"
+        const otherSum = sortedControls.slice(6).reduce((sum, control) => sum + controlCounts[control], 0);
+        labels.push('Other');
+        counts.push(otherSum);
+        colors.push('#999999');
+    }
+    
+    // Destroy previous chart if it exists
+    if (charts.trafficControl) {
+        charts.trafficControl.destroy();
+    }
+    
+    // Create new chart
+    charts.trafficControl = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            plugins: {
+                ...commonChartOptions.plugins,
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Traffic Control Types',
+                    font: {
+                        size: 11
+                    }
+                }
+            }
+        }
+    });
+}
+
 // Clear selection button event listener
 document.getElementById('clear-btn').addEventListener('click', function() {
     draw.deleteAll();
@@ -1077,9 +1695,32 @@ function updateMetrics(data) {
     const pedestrianFatalities = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
     document.getElementById('pedestrian-fatalities').textContent = pedestrianFatalities;
     
-    // Bicycle crashes - assuming they are marked as a specific type or have a property
-    // Since we don't have actual bicycle data in our dataset, we'll keep it as zero
-    document.getElementById('bicycle-crashes').textContent = '0';
+    // Motorcycle crashes
+    const motorcycleCrashes = data.filter(crash => crash.motorcycle_involved === true).length;
+    document.getElementById('bicycle-crashes').textContent = motorcycleCrashes;
+    
+    // Bicycle crashes 
+    const bicycleCrashes = data.filter(crash => crash.bicycle_involved === true).length;
+    // Update the label to reflect motorcycle counts instead of bicycle
+    const bicycleLabel = document.querySelector('.metric-card:last-child .metric-label');
+    if (bicycleLabel) {
+        bicycleLabel.textContent = 'Motorcycle';
+    }
+    
+    // Add a new metric card for bicycle if it doesn't exist
+    const metricsContainer = document.querySelector('.metrics-container');
+    if (metricsContainer && !document.getElementById('bicycle-crashes-card')) {
+        const bicycleCard = document.createElement('div');
+        bicycleCard.className = 'metric-card';
+        bicycleCard.id = 'bicycle-crashes-card';
+        bicycleCard.innerHTML = `
+            <div id="bicycle-crashes-count" class="metric-value">${bicycleCrashes}</div>
+            <div class="metric-label">Bicycle</div>
+        `;
+        metricsContainer.appendChild(bicycleCard);
+    } else if (document.getElementById('bicycle-crashes-count')) {
+        document.getElementById('bicycle-crashes-count').textContent = bicycleCrashes;
+    }
 }
 
 // Update counter display with crash statistics

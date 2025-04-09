@@ -26,6 +26,7 @@
     <header>
         <h1>Virginia Crash Data Visualizer</h1>
         <p>Draw a selection box on the map to visualize crash data in that area</p>
+        <a href="https://v-gpt.onrender.com/" target="_blank" id="va-data-gpt" class="gpt-link">Virginia Data Portal GPT</a>
     </header>
     
     <div id="metrics-dashboard">
@@ -52,7 +53,7 @@
             </div>
             <div class="metric-card">
                 <div id="bicycle-crashes" class="metric-value">0</div>
-                <div class="metric-label">Bicycle</div>
+                <div class="metric-label">Bicycle Crashes</div>
             </div>
         </div>
     </div>
@@ -71,23 +72,39 @@
                 <canvas id="pedestrianChart"></canvas>
             </div>
             <div class="chart-box">
-                <h3>Vehicular Crashes by Year</h3>
-                <canvas id="vehicleChart"></canvas>
+                <h3>Crashes by Month</h3>
+                <canvas id="monthlyChart"></canvas>
             </div>
             <div class="chart-box">
-                <h3>Total Crashes by Type</h3>
-                <canvas id="typesChart"></canvas>
+                <h3>Day vs. Night Crashes</h3>
+                <canvas id="daynightChart"></canvas>
             </div>
             <div class="chart-box">
                 <h3>Severity and Injuries</h3>
                 <canvas id="severityChart"></canvas>
             </div>
+            <div class="chart-box">
+                <h3>Intersection Type Distribution</h3>
+                <canvas id="intersectionChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Metrics Trend by Year</h3>
+                <canvas id="metricsTrendChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Pedestrian Action Category</h3>
+                <canvas id="pedestrianActionChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Traffic Control Type</h3>
+                <canvas id="trafficControlChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Motorcycle Crashes by Action</h3>
+                <canvas id="motorcycleChart"></canvas>
+            </div>
         </div>
     </main>
-    
-    <footer>
-        <p>Virginia Crash Data Visualizer &copy; 2024</p>
-    </footer>
 
     <!-- Custom JavaScript -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
