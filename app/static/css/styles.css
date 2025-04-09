@@ -23,6 +23,21 @@ header {
     align-items: center;
 }
 
+.github-link {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    color: white;
+    font-size: 28px;
+    transition: transform 0.3s ease;
+    z-index: 10;
+}
+
+.github-link:hover {
+    transform: scale(1.2);
+    color: #1E88E5;
+}
+
 header h1 {
     margin-bottom: 0.5rem;
 }
@@ -85,10 +100,12 @@ header h1 {
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-top: 5px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    width: 100%;
 }
 
-.action-button {
+.action-button, .gpt-link {
     background-color: #1E88E5;
     color: white;
     border: none;
@@ -98,29 +115,20 @@ header h1 {
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     transition: background-color 0.2s ease;
+    height: 32px;
+    line-height: 1;
+    text-decoration: none;
 }
 
-.action-button:hover {
+.action-button:hover, .gpt-link:hover {
     background-color: #1565C0;
 }
 
 .gpt-link {
-    color: #ffffff;
-    background-color: #1E88E5;
-    padding: 6px 12px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 14px;
-    display: inline-block;
-    margin-top: 10px;
-    transition: background-color 0.2s ease;
     position: relative;
-}
-
-.gpt-link:hover {
-    background-color: #1565C0;
 }
 
 .gpt-link:hover:after {
@@ -176,7 +184,7 @@ main {
 .map-controls {
     position: absolute;
     top: 10px;
-    right: 10px;
+    left: 10px;
     z-index: 1;
 }
 
@@ -257,7 +265,7 @@ footer {
 
 .map-instructions {
     position: absolute;
-    top: 10px;
+    top: 50px;
     left: 10px;
     z-index: 1;
     max-width: 250px;
@@ -342,7 +350,7 @@ footer {
 /* Custom polygon button */
 .polygon-control {
     position: absolute;
-    top: 110px;
+    top: 150px;
     right: 10px;
     z-index: 10;
     background: white;
@@ -543,4 +551,46 @@ footer {
     gap: 10px;
     max-width: 1200px;
     margin: 0 auto;
+}
+
+.map-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 10px;
+    background-color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+    font-size: 12px;
+    z-index: 10;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.legend-color {
+    width: 15px;
+    height: 3px;
+    margin-right: 5px;
+}
+
+.trail-legend-color {
+    background-color: #007F00;
+    height: 4px;
+}
+
+.top-center-message {
+    top: 10px; 
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-weight: bold;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    z-index: 15;
 } 
