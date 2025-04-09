@@ -76,14 +76,33 @@ function initMap() {
         return;
     }
     
-    // Virginia center coordinates
-    const vaCenter = [-78.6, 37.5];
-    const defaultZoom = 7;
+    // Virginia center coordinates - adjusted to better center the state
+    const vaCenter = [-79.5, 37.7];
+    const defaultZoom = 6.5; // Decreased from 7 to show more of Virginia
     
     // Initialize the map
     map = new maplibregl.Map({
         container: 'map',
-        style: 'https://demotiles.maplibre.org/style.json', // Free MapLibre demo tiles that don't require an API key
+        style: {
+            version: 8,
+            sources: {
+                'osm': {
+                    type: 'raster',
+                    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }
+            },
+            layers: [
+                {
+                    id: 'osm',
+                    type: 'raster',
+                    source: 'osm',
+                    minzoom: 0,
+                    maxzoom: 19
+                }
+            ]
+        },
         center: vaCenter,
         zoom: defaultZoom,
         attributionControl: true
@@ -310,15 +329,28 @@ function initMap() {
             { name: 'Charlottesville', coordinates: [-78.4767, 38.0293] },
             { name: 'Lynchburg', coordinates: [-79.1422, 37.4138] },
             { name: 'Blacksburg', coordinates: [-80.4139, 37.2296] },
-            { name: 'Bristol', coordinates: [-82.1887, 36.5961] }
+            { name: 'Bristol', coordinates: [-82.1887, 36.5961] },
+            { name: 'Fredericksburg', coordinates: [-77.4605, 38.3032] },
+            { name: 'Harrisonburg', coordinates: [-78.8689, 38.4496] },
+            { name: 'Winchester', coordinates: [-78.1633, 39.1857] },
+            { name: 'Danville', coordinates: [-79.3950, 36.5859] },
+            { name: 'Newport News', coordinates: [-76.5205, 37.0871] },
+            { name: 'Hampton', coordinates: [-76.3452, 37.0298] },
+            { name: 'Chesapeake', coordinates: [-76.2875, 36.7682] },
+            { name: 'Staunton', coordinates: [-79.0717, 38.1496] },
+            { name: 'Petersburg', coordinates: [-77.4019, 37.2279] },
+            { name: 'Williamsburg', coordinates: [-76.7075, 37.2707] }
         ];
         
         // Add city names
-        virginiaCities.forEach(city => {
+        virginiaCities.forEach((city, index) => {
+            // Determine if this is a major city (first 10 are major)
+            const isMajorCity = index < 10;
+            
             // Add city marker
             const marker = new maplibregl.Marker({
-                color: "#003366",
-                scale: 0.7
+                color: isMajorCity ? "#003366" : "#666666",
+                scale: isMajorCity ? 0.7 : 0.5
             })
             .setLngLat(city.coordinates)
             .setPopup(new maplibregl.Popup({
@@ -334,7 +366,7 @@ function initMap() {
             
             // Add text label
             const cityLabel = document.createElement('div');
-            cityLabel.className = 'city-label';
+            cityLabel.className = `city-label ${isMajorCity ? 'major-city' : 'minor-city'}`;
             cityLabel.textContent = city.name;
             
             new maplibregl.Marker({
@@ -344,6 +376,28 @@ function initMap() {
             .setLngLat(city.coordinates)
             .addTo(map);
         });
+        
+        // Add zoom event to show/hide minor cities based on zoom level
+        map.on('zoom', () => {
+            const currentZoom = map.getZoom();
+            const mapContainer = document.getElementById('map');
+            
+            if (currentZoom < 7) {
+                mapContainer.classList.add('hide-minor-cities');
+            } else {
+                mapContainer.classList.remove('hide-minor-cities');
+            }
+        });
+        
+        // Trigger initial zoom check
+        setTimeout(() => {
+            const currentZoom = map.getZoom();
+            const mapContainer = document.getElementById('map');
+            
+            if (currentZoom < 7) {
+                mapContainer.classList.add('hide-minor-cities');
+            }
+        }, 500);
         
         // Add crash data to map
         addCrashDataToMap();
