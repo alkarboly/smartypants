@@ -1606,31 +1606,26 @@ function updateMetrics(data) {
     const pedestrianFatalities = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
     document.getElementById('pedestrian-fatalities').textContent = pedestrianFatalities;
     
-    // Motorcycle crashes
-    const motorcycleCrashes = data.filter(crash => crash.motorcycle_involved === true).length;
-    document.getElementById('bicycle-crashes').textContent = motorcycleCrashes;
-    
-    // Bicycle crashes 
+    // Bicycle crashes
     const bicycleCrashes = data.filter(crash => crash.bicycle_involved === true).length;
-    // Update the label to reflect motorcycle counts instead of bicycle
-    const bicycleLabel = document.querySelector('.metric-card:last-child .metric-label');
-    if (bicycleLabel) {
-        bicycleLabel.textContent = 'Motorcycle';
-    }
+    document.getElementById('bicycle-crashes').textContent = bicycleCrashes;
     
-    // Add a new metric card for bicycle if it doesn't exist
+    // Motorcycle crashes 
+    const motorcycleCrashes = data.filter(crash => crash.motorcycle_involved === true).length;
+    
+    // Add a new metric card for motorcycle if it doesn't exist
     const metricsContainer = document.querySelector('.metrics-container');
-    if (metricsContainer && !document.getElementById('bicycle-crashes-card')) {
-        const bicycleCard = document.createElement('div');
-        bicycleCard.className = 'metric-card';
-        bicycleCard.id = 'bicycle-crashes-card';
-        bicycleCard.innerHTML = `
-            <div id="bicycle-crashes-count" class="metric-value">${bicycleCrashes}</div>
-            <div class="metric-label">Bicycle</div>
+    if (metricsContainer && !document.getElementById('motorcycle-crashes-card')) {
+        const motorcycleCard = document.createElement('div');
+        motorcycleCard.className = 'metric-card';
+        motorcycleCard.id = 'motorcycle-crashes-card';
+        motorcycleCard.innerHTML = `
+            <div id="motorcycle-crashes-count" class="metric-value">${motorcycleCrashes}</div>
+            <div class="metric-label">Motorcycle Crashes</div>
         `;
-        metricsContainer.appendChild(bicycleCard);
-    } else if (document.getElementById('bicycle-crashes-count')) {
-        document.getElementById('bicycle-crashes-count').textContent = bicycleCrashes;
+        metricsContainer.appendChild(motorcycleCard);
+    } else if (document.getElementById('motorcycle-crashes-count')) {
+        document.getElementById('motorcycle-crashes-count').textContent = motorcycleCrashes;
     }
 }
 
@@ -1789,94 +1784,105 @@ function setupPdfDownload() {
     const downloadBtn = document.getElementById('download-pdf');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', function() {
-            // Alert for now - PDF generation would need server-side implementation
-            alert('PDF generation would be implemented here. This would generate a clean PDF report of the current visualization state.');
+            // Show loading message
+            downloadBtn.textContent = "Generating PDF...";
+            downloadBtn.disabled = true;
             
-            /* 
-            For a real implementation, we would:
-            1. Collect all the chart canvases
-            2. Use a library like jsPDF, html2pdf, or html2canvas
-            3. Generate a clean PDF with the charts and metrics
-            4. Trigger the download
+            // Get current date for the report
+            const currentDate = new Date().toLocaleDateString();
             
-            Example full implementation:
+            // Use jsPDF to create a new PDF document
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
             
-            import html2canvas from 'html2canvas';
-            import { jsPDF } from 'jspdf';
+            // Set the title of the document
+            doc.setFontSize(20);
+            doc.text("Virginia Transportation Corridor Analysis", pageWidth / 2, 20, { align: 'center' });
             
-            // Collect all the charts
-            const charts = document.querySelectorAll('.chart-box');
-            const metrics = document.getElementById('metrics-dashboard');
+            doc.setFontSize(12);
+            doc.text(`Report generated on ${currentDate}`, pageWidth / 2, 30, { align: 'center' });
             
-            // Create a temporary container for the report
-            const reportContainer = document.createElement('div');
-            reportContainer.style.width = '8.5in';
-            reportContainer.style.background = 'white';
-            reportContainer.style.padding = '0.5in';
-            
-            // Add title and header
-            const header = document.createElement('div');
-            header.innerHTML = `
-                <h1>Virginia Transportation Corridor Analysis</h1>
-                <p>Report generated on ${new Date().toLocaleDateString()}</p>
-            `;
-            reportContainer.appendChild(header);
-            
-            // Capture metrics
-            html2canvas(metrics).then(canvas => {
-                const metricsImage = canvas.toDataURL('image/png');
-                const metricsSection = document.createElement('div');
-                metricsSection.innerHTML = `
-                    <h2>Key Metrics</h2>
-                    <img src="${metricsImage}" style="width: 100%;" />
-                `;
-                reportContainer.appendChild(metricsSection);
+            // Capture the metrics dashboard
+            const metricsPromise = html2canvas(document.getElementById('metrics-dashboard'), {
+                scale: 2,
+                logging: false
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = pageWidth - 40; // 20mm margins on each side
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
                 
-                // Capture charts
-                const captureAllCharts = Array.from(charts).map((chart, i) => {
-                    return html2canvas(chart).then(canvas => {
-                        return {
-                            title: chart.querySelector('h3').textContent,
-                            image: canvas.toDataURL('image/png'),
-                            index: i
-                        };
-                    });
-                });
+                doc.text("Key Metrics", pageWidth / 2, 40, { align: 'center' });
+                doc.addImage(imgData, 'PNG', 20, 45, imgWidth, imgHeight);
                 
-                Promise.all(captureAllCharts).then(results => {
-                    // Sort results by original index
-                    results.sort((a, b) => a.index - b.index);
-                    
-                    // Add charts to report
-                    const chartsSection = document.createElement('div');
-                    chartsSection.innerHTML = `<h2>Analysis Charts</h2>`;
-                    
-                    results.forEach(result => {
-                        const chartDiv = document.createElement('div');
-                        chartDiv.style.marginBottom = '20px';
-                        chartDiv.innerHTML = `
-                            <h3>${result.title}</h3>
-                            <img src="${result.image}" style="width: 100%;" />
-                        `;
-                        chartsSection.appendChild(chartDiv);
-                    });
-                    
-                    reportContainer.appendChild(chartsSection);
-                    
-                    // Create the PDF
-                    const pdf = new jsPDF('p', 'pt', 'letter');
-                    
-                    // Add the report content to the document
-                    pdf.html(reportContainer, {
-                        callback: function(pdf) {
-                            pdf.save('virginia-corridor-analysis.pdf');
-                        },
-                        x: 0,
-                        y: 0
-                    });
-                });
+                return 45 + imgHeight + 10; // Return the Y position for the next element
             });
-            */
+            
+            // After capturing metrics, capture each chart
+            metricsPromise.then(yPosition => {
+                let currentY = yPosition;
+                const chartBoxes = document.querySelectorAll('.chart-box');
+                const chartPromises = [];
+                
+                // If we're going to go beyond the first page, add a new page
+                if (currentY > 250) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+                
+                doc.setFontSize(16);
+                doc.text("Analysis Charts", pageWidth / 2, currentY, { align: 'center' });
+                currentY += 10;
+                
+                // Capture each chart
+                chartBoxes.forEach((chartBox, index) => {
+                    const chartPromise = html2canvas(chartBox, {
+                        scale: 2,
+                        logging: false
+                    }).then(canvas => {
+                        const imgData = canvas.toDataURL('image/png');
+                        const imgWidth = pageWidth - 40;
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        
+                        // Check if we need to add a new page
+                        if (currentY + imgHeight > 270) {
+                            doc.addPage();
+                            currentY = 20;
+                        }
+                        
+                        // Add the chart title
+                        const title = chartBox.querySelector('h3').textContent;
+                        doc.setFontSize(12);
+                        doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+                        
+                        // Add the chart image
+                        doc.addImage(imgData, 'PNG', 20, currentY + 5, imgWidth, imgHeight);
+                        currentY += imgHeight + 15;
+                    });
+                    
+                    chartPromises.push(chartPromise);
+                });
+                
+                // When all charts have been captured, save the PDF
+                Promise.all(chartPromises).then(() => {
+                    // Save the PDF
+                    doc.save('Virginia-Corridor-Analysis.pdf');
+                    
+                    // Reset the button
+                    downloadBtn.textContent = "Download PDF";
+                    downloadBtn.disabled = false;
+                }).catch(error => {
+                    console.error('Error generating PDF:', error);
+                    alert('Error generating PDF. Please try again.');
+                    downloadBtn.textContent = "Download PDF";
+                    downloadBtn.disabled = false;
+                });
+            }).catch(error => {
+                console.error('Error capturing metrics:', error);
+                alert('Error generating PDF. Please try again.');
+                downloadBtn.textContent = "Download PDF";
+                downloadBtn.disabled = false;
+            });
         });
     }
 } 
