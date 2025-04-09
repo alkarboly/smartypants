@@ -20,6 +20,9 @@ async function fetchCrashData() {
         }
         crashData = await response.json();
         console.log('Crash data loaded:', crashData.length, 'records');
+        
+        // Initialize metrics with all data
+        updateMetrics(crashData);
     } catch (error) {
         console.error('Error fetching crash data:', error);
         alert('Failed to load crash data. Please try again later.');
@@ -1052,30 +1055,44 @@ function updateSelectedCrashesLayer(filteredData) {
     });
 }
 
+// Calculate and update metrics based on the provided data
+function updateMetrics(data) {
+    // Total crashes
+    const totalCrashes = data.length;
+    document.getElementById('total-crashes').textContent = totalCrashes;
+    
+    // Fatal crashes (crashes with at least one fatality)
+    const fatalCrashes = data.filter(crash => parseInt(crash.fatalities || 0) > 0).length;
+    document.getElementById('fatal-crashes').textContent = fatalCrashes;
+    
+    // Injury crashes (crashes with at least one injury)
+    const injuryCrashes = data.filter(crash => parseInt(crash.injuries || 0) > 0).length;
+    document.getElementById('injury-crashes').textContent = injuryCrashes;
+    
+    // Pedestrian injuries and fatalities
+    const pedestrianData = data.filter(crash => crash.crash_type === 'pedestrian');
+    const pedestrianInjuries = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.injuries || 0), 0);
+    document.getElementById('pedestrian-injuries').textContent = pedestrianInjuries;
+    
+    const pedestrianFatalities = pedestrianData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
+    document.getElementById('pedestrian-fatalities').textContent = pedestrianFatalities;
+    
+    // Bicycle crashes - assuming they are marked as a specific type or have a property
+    // Since we don't have actual bicycle data in our dataset, we'll keep it as zero
+    document.getElementById('bicycle-crashes').textContent = '0';
+}
+
 // Update counter display with crash statistics
 function updateCounterDisplay(filteredData) {
-    // Get the counter box
+    // Update metrics with filtered data
+    updateMetrics(filteredData);
+    
+    // The previous code for the counter overlay is now redundant
+    // Hide the counter overlay if it exists (for backward compatibility)
     const counterBox = document.getElementById('counter-box');
-    if (!counterBox) return;
-    
-    // Count by type
-    const pedestrianCount = filteredData.filter(crash => crash.crash_type === 'pedestrian').length;
-    const vehicleCount = filteredData.filter(crash => crash.crash_type === 'vehicle').length;
-    
-    // Count injuries and fatalities
-    const injuries = filteredData.reduce((sum, crash) => sum + parseInt(crash.injuries || 0), 0);
-    const fatalities = filteredData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
-    
-    // Update the counter box with HTML content
-    counterBox.innerHTML = `
-        <div><strong>Pedestrian Crashes:</strong> ${pedestrianCount}</div>
-        <div><strong>Vehicle Crashes:</strong> ${vehicleCount}</div>
-        <div><strong>Total Injuries:</strong> ${injuries}</div>
-        <div><strong>Total Fatalities:</strong> ${fatalities}</div>
-    `;
-    
-    // Show the counter box
-    counterBox.style.display = 'flex';
+    if (counterBox) {
+        counterBox.style.display = 'none';
+    }
 }
 
 // Set up popups for crash points
@@ -1201,6 +1218,10 @@ function resetVisualization() {
     
     // Reset charts
     initCharts(crashData);
+    
+    // Reset metrics to show all data
+    updateMetrics(crashData);
+    
     mapDrawn = false;
     
     // Update status message

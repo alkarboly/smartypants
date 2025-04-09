@@ -158,10 +158,44 @@ footer {
     display: flex;
     gap: 15px;
     font-size: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 80%;
 }
 
 .counter-overlay strong {
     color: #003366;
+}
+
+.metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    min-width: 120px;
+    text-align: center;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #003366;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 13px;
+    color: #555;
 }
 
 /* Make mapbox draw controls more visible */
@@ -247,8 +281,20 @@ footer {
     }
     
     .counter-overlay {
-        flex-direction: column;
-        gap: 5px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .metric-card {
+        min-width: 100px;
+        padding: 8px 10px;
+    }
+    
+    .metric-value {
+        font-size: 22px;
     }
 }
 
@@ -335,4 +381,19 @@ footer {
 .map-button.active {
     background-color: #e6f2ff;
     color: #0078FF;
+}
+
+#metrics-dashboard {
+    background-color: #f0f5fa;
+    padding: 1rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.metrics-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    max-width: 1200px;
+    margin: 0 auto;
 } 
