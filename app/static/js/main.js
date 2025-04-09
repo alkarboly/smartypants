@@ -3,6 +3,7 @@ let crashData = [];
 let mapDrawn = false;
 let draw;
 let map;
+let isMobile = false; // Track if we're on mobile
 let charts = {
     pedestrian: null,
     monthly: null,  // Changed from vehicle
@@ -14,6 +15,14 @@ let charts = {
     trafficControl: null
 };
 let quadMode;
+
+// Check if device is mobile
+function checkMobile() {
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 768)
+    );
+}
 
 // Common chart options for better layout
 const commonChartOptions = {
@@ -76,9 +85,13 @@ function initMap() {
         return;
     }
     
+    // Check if we're on a mobile device
+    isMobile = checkMobile();
+    console.log('Mobile device detected:', isMobile);
+    
     // Virginia center coordinates - adjusted to better center the state
     const vaCenter = [-79.5, 37.7];
-    const defaultZoom = 6.5; // Decreased from 7 to show more of Virginia
+    const defaultZoom = isMobile ? 5.5 : 6.5; // Smaller zoom on mobile for better visibility
     
     // Initialize the map
     map = new maplibregl.Map({
@@ -141,15 +154,15 @@ function initMap() {
     boxButton.style.position = 'absolute';
     boxButton.style.top = '150px'; // Changed from 110px to 150px to avoid overlap
     boxButton.style.right = '10px';
-    boxButton.style.width = '32px';
-    boxButton.style.height = '32px';
+    boxButton.style.width = isMobile ? '44px' : '32px'; // Larger on mobile
+    boxButton.style.height = isMobile ? '44px' : '32px'; // Larger on mobile
     boxButton.style.backgroundColor = 'white';
     boxButton.style.border = 'none';
     boxButton.style.borderRadius = '4px';
     boxButton.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.1)';
     boxButton.style.cursor = 'pointer';
     boxButton.style.textAlign = 'center';
-    boxButton.style.fontSize = '20px';
+    boxButton.style.fontSize = isMobile ? '24px' : '20px'; // Larger on mobile
     boxButton.style.fontWeight = 'bold';
     boxButton.style.color = '#333';
     boxButton.style.zIndex = '10';
@@ -183,13 +196,33 @@ function initMap() {
             boxButton.style.color = '#333';
             mapCanvas.style.cursor = 'grab';
             statusDiv.innerHTML = '<p>Click the square icon to draw a corridor</p>';
+            
+            // Remove touch interceptor if it exists
+            const touchInterceptor = document.getElementById('touch-interceptor');
+            if (touchInterceptor) touchInterceptor.remove();
         } else {
             // Turn on selection mode
             isSelecting = true;
             boxButton.style.backgroundColor = '#e6f2ff';
             boxButton.style.color = '#0078FF';
             mapCanvas.style.cursor = 'crosshair';
-            statusDiv.innerHTML = '<p>Click and drag to draw a corridor</p>';
+            
+            if (isMobile) {
+                statusDiv.innerHTML = '<p>Tap and drag to draw a corridor</p>';
+                
+                // Create an overlay to intercept touch events and prevent map interaction
+                const touchInterceptor = document.createElement('div');
+                touchInterceptor.id = 'touch-interceptor';
+                touchInterceptor.style.position = 'absolute';
+                touchInterceptor.style.top = '0';
+                touchInterceptor.style.left = '0';
+                touchInterceptor.style.width = '100%';
+                touchInterceptor.style.height = '100%';
+                touchInterceptor.style.zIndex = '4'; // Below selection box but above map
+                document.getElementById('map-container').appendChild(touchInterceptor);
+            } else {
+                statusDiv.innerHTML = '<p>Click and drag to draw a corridor</p>';
+            }
             
             // Clear any existing selection
             selectionBox.style.display = 'none';
@@ -197,22 +230,22 @@ function initMap() {
         }
     });
     
-    // Clear button functionality
-    const clearBtn = document.getElementById('clear-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-            resetVisualization();
-            selectionBox.style.display = 'none';
-        });
-    }
-    
-    // Mouse events for box selection
-    mapCanvas.addEventListener('mousedown', function(e) {
+    // Mouse/touch events for box selection
+    const startDrawing = function(e) {
         if (!isSelecting) return;
         
+        // For touch events, completely prevent default behavior to avoid scrolling
+        if (e.type === 'touchstart') {
+            e.preventDefault();
+        }
+        
         const rect = mapCanvas.getBoundingClientRect();
-        startX = e.clientX - rect.left;
-        startY = e.clientY - rect.top;
+        // Get appropriate coordinates based on device type
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        startX = clientX - rect.left;
+        startY = clientY - rect.top;
         
         selectionBox.style.left = startX + 'px';
         selectionBox.style.top = startY + 'px';
@@ -223,14 +256,47 @@ function initMap() {
         // Prevent map dragging during selection
         e.preventDefault();
         e.stopPropagation();
-    });
+        
+        // Show visual feedback on mobile
+        if (isMobile) {
+            // Add a starting point indicator
+            const startPointIndicator = document.createElement('div');
+            startPointIndicator.id = 'start-point-indicator';
+            startPointIndicator.style.position = 'absolute';
+            startPointIndicator.style.width = '20px';
+            startPointIndicator.style.height = '20px';
+            startPointIndicator.style.borderRadius = '50%';
+            startPointIndicator.style.backgroundColor = '#0078FF';
+            startPointIndicator.style.transform = 'translate(-50%, -50%)';
+            startPointIndicator.style.left = startX + 'px';
+            startPointIndicator.style.top = startY + 'px';
+            startPointIndicator.style.zIndex = '100';
+            startPointIndicator.style.boxShadow = '0 0 0 2px white';
+            document.getElementById('selection-box-container').appendChild(startPointIndicator);
+            
+            // Update status message
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.innerHTML = '<p>Now drag to define the corridor area</p>';
+            statusDiv.style.backgroundColor = 'rgba(0, 120, 255, 0.9)';
+            statusDiv.style.color = 'white';
+        }
+    };
     
-    mapCanvas.addEventListener('mousemove', function(e) {
+    const updateDrawing = function(e) {
         if (!isSelecting || selectionBox.style.display === 'none') return;
         
+        // Always prevent default on touch moves to avoid scrolling
+        if (e.type === 'touchmove') {
+            e.preventDefault();
+        }
+        
         const rect = mapCanvas.getBoundingClientRect();
-        const currentX = e.clientX - rect.left;
-        const currentY = e.clientY - rect.top;
+        // Get appropriate coordinates based on device type
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        const currentX = clientX - rect.left;
+        const currentY = clientY - rect.top;
         
         const width = Math.abs(currentX - startX);
         const height = Math.abs(currentY - startY);
@@ -246,22 +312,62 @@ function initMap() {
         // Prevent map dragging during selection
         e.preventDefault();
         e.stopPropagation();
-    });
+        
+        // Update visual indicator on mobile
+        if (isMobile) {
+            const endPointIndicator = document.getElementById('end-point-indicator') || document.createElement('div');
+            if (!endPointIndicator.id) {
+                endPointIndicator.id = 'end-point-indicator';
+                endPointIndicator.style.position = 'absolute';
+                endPointIndicator.style.width = '20px';
+                endPointIndicator.style.height = '20px';
+                endPointIndicator.style.borderRadius = '50%';
+                endPointIndicator.style.backgroundColor = '#FF5533';
+                endPointIndicator.style.transform = 'translate(-50%, -50%)';
+                endPointIndicator.style.zIndex = '100';
+                endPointIndicator.style.boxShadow = '0 0 0 2px white';
+                document.getElementById('selection-box-container').appendChild(endPointIndicator);
+            }
+            endPointIndicator.style.left = currentX + 'px';
+            endPointIndicator.style.top = currentY + 'px';
+        }
+    };
     
-    mapCanvas.addEventListener('mouseup', function(e) {
+    const finishDrawing = function(e) {
         if (!isSelecting || selectionBox.style.display === 'none') return;
         
         const rect = mapCanvas.getBoundingClientRect();
-        const endX = e.clientX - rect.left;
-        const endY = e.clientY - rect.top;
+        // Get appropriate coordinates based on device type
+        const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+        const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+        
+        const endX = clientX - rect.left;
+        const endY = clientY - rect.top;
+        
+        // Remove any visual indicators
+        const startPointIndicator = document.getElementById('start-point-indicator');
+        const endPointIndicator = document.getElementById('end-point-indicator');
+        if (startPointIndicator) startPointIndicator.remove();
+        if (endPointIndicator) endPointIndicator.remove();
+        
+        // Reset status message appearance
+        const statusDiv = document.getElementById('status-message');
+        statusDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+        statusDiv.style.color = 'black';
         
         // Verify we have a minimum size box
         const width = Math.abs(endX - startX);
         const height = Math.abs(endY - startY);
         
-        if (width < 10 || height < 10) {
+        // Make minimum size smaller on mobile
+        const minSize = isMobile ? 5 : 10;
+        if (width < minSize || height < minSize) {
             // Box too small, ignore
             selectionBox.style.display = 'none';
+            statusDiv.innerHTML = '<p>Corridor too small. Try again with a larger area.</p>';
+            setTimeout(() => {
+                statusDiv.innerHTML = '<p>Tap the square icon to draw a corridor</p>';
+            }, 2000);
             return;
         }
         
@@ -301,7 +407,26 @@ function initMap() {
         boxButton.style.backgroundColor = 'white';
         boxButton.style.color = '#333';
         mapCanvas.style.cursor = 'grab';
-    });
+    };
+    
+    // Add mouse event listeners
+    mapCanvas.addEventListener('mousedown', startDrawing);
+    mapCanvas.addEventListener('mousemove', updateDrawing);
+    mapCanvas.addEventListener('mouseup', finishDrawing);
+    
+    // Add touch event listeners for mobile
+    mapCanvas.addEventListener('touchstart', startDrawing);
+    mapCanvas.addEventListener('touchmove', updateDrawing);
+    mapCanvas.addEventListener('touchend', finishDrawing);
+    
+    // Clear button functionality
+    const clearBtn = document.getElementById('clear-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            resetVisualization();
+            selectionBox.style.display = 'none';
+        });
+    }
     
     map.on('load', function() {
         // Add some attribution
@@ -858,7 +983,10 @@ function updatePedestrianChart(data) {
                 backgroundColor: 'rgba(51, 136, 255, 0.1)',
                 borderWidth: 2,
                 fill: true,
-                tension: 0.1
+                tension: 0.1,
+                pointStyle: 'circle',
+                pointRadius: 4,
+                pointHoverRadius: 6
             }]
         },
         options: {
@@ -960,7 +1088,13 @@ function updateMonthlyChart(data) {
                 borderColor: 'rgba(0, 0, 0, 0.1)',
                 borderWidth: 1,
                 barPercentage: 0.8,
-                categoryPercentage: 0.9
+                categoryPercentage: 0.9,
+                // Add data points on top of bars
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    anchor: 'end'
+                }
             }]
         },
         options: {
@@ -996,6 +1130,17 @@ function updateMonthlyChart(data) {
                     text: `Crashes by Month (${data.length} total)`,
                     font: {
                         size: 11
+                    }
+                },
+                // Show data values on bars
+                datalabels: {
+                    color: '#000',
+                    font: {
+                        weight: 'bold',
+                        size: 9
+                    },
+                    formatter: (value) => {
+                        return value > 0 ? value : '';
                     }
                 }
             }
@@ -1166,6 +1311,17 @@ function updateSeverityChart(data) {
                 title: {
                     display: true,
                     text: `Crash Severity (${data.length} total)`
+                },
+                // Show data values on bars
+                datalabels: {
+                    color: '#000',
+                    font: {
+                        weight: 'bold',
+                        size: 10
+                    },
+                    formatter: (value) => {
+                        return value > 0 ? value : '';
+                    }
                 }
             }
         }
@@ -1297,7 +1453,10 @@ function updateMetricsTrendChart(data) {
             backgroundColor: 'rgba(51, 136, 255, 0.1)',
             borderWidth: 2,
             fill: false,
-            tension: 0.1
+            tension: 0.1,
+            pointStyle: 'circle',
+            pointRadius: 4,
+            pointHoverRadius: 6
         },
         {
             label: 'Fatal Crashes',
@@ -1306,7 +1465,10 @@ function updateMetricsTrendChart(data) {
             backgroundColor: 'rgba(255, 85, 51, 0.1)',
             borderWidth: 2,
             fill: false,
-            tension: 0.1
+            tension: 0.1,
+            pointStyle: 'circle',
+            pointRadius: 4,
+            pointHoverRadius: 6
         },
         {
             label: 'Injury Crashes',
@@ -1315,7 +1477,10 @@ function updateMetricsTrendChart(data) {
             backgroundColor: 'rgba(51, 204, 153, 0.1)',
             borderWidth: 2,
             fill: false,
-            tension: 0.1
+            tension: 0.1,
+            pointStyle: 'circle',
+            pointRadius: 4,
+            pointHoverRadius: 6
         },
         {
             label: 'Pedestrian Injuries',
@@ -1324,7 +1489,10 @@ function updateMetricsTrendChart(data) {
             backgroundColor: 'rgba(255, 153, 0, 0.1)',
             borderWidth: 2,
             fill: false,
-            tension: 0.1
+            tension: 0.1,
+            pointStyle: 'circle',
+            pointRadius: 4,
+            pointHoverRadius: 6
         },
         {
             label: 'Pedestrian Fatalities',
@@ -1333,7 +1501,10 @@ function updateMetricsTrendChart(data) {
             backgroundColor: 'rgba(153, 102, 204, 0.1)',
             borderWidth: 2,
             fill: false,
-            tension: 0.1
+            tension: 0.1,
+            pointStyle: 'circle',
+            pointRadius: 4,
+            pointHoverRadius: 6
         }
     ];
     
