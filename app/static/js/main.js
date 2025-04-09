@@ -11,8 +11,7 @@ let charts = {
     intersection: null,
     metricsTrend: null,
     pedestrianAction: null,
-    trafficControl: null,
-    motorcycle: null
+    trafficControl: null
 };
 let quadMode;
 
@@ -141,7 +140,7 @@ function initMap() {
     const statusDiv = document.createElement('div');
     statusDiv.id = 'status-message';
     statusDiv.className = 'map-overlay';
-    statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+    statusDiv.innerHTML = '<p>Click the square icon to draw a corridor</p>';
     document.getElementById('map-container').appendChild(statusDiv);
     
     // Create counter box
@@ -164,14 +163,14 @@ function initMap() {
             boxButton.style.backgroundColor = 'white';
             boxButton.style.color = '#333';
             mapCanvas.style.cursor = 'grab';
-            statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+            statusDiv.innerHTML = '<p>Click the square icon to draw a corridor</p>';
         } else {
             // Turn on selection mode
             isSelecting = true;
             boxButton.style.backgroundColor = '#e6f2ff';
             boxButton.style.color = '#0078FF';
             mapCanvas.style.cursor = 'crosshair';
-            statusDiv.innerHTML = '<p>Click and drag to draw a selection box</p>';
+            statusDiv.innerHTML = '<p>Click and drag to draw a corridor</p>';
             
             // Clear any existing selection
             selectionBox.style.display = 'none';
@@ -666,7 +665,7 @@ function updateVisualization() {
         console.log(`Total filtered data points: ${filteredData.length}`);
         
         if (filteredData.length === 0) {
-            statusDiv.innerHTML = '<p>No crashes found in the selected area</p>';
+            statusDiv.innerHTML = '<p>No crashes found in the selected corridor</p>';
             // Keep the charts with all data
             return;
         }
@@ -683,7 +682,7 @@ function updateVisualization() {
         mapDrawn = true;
         
         // Update status message
-        statusDiv.innerHTML = `<p>Showing ${filteredData.length} crashes in selected area</p>`;
+        statusDiv.innerHTML = `<p>Showing ${filteredData.length} crashes in selected corridor</p>`;
         
         // Update counter displays
         updateCounterDisplay(filteredData);
@@ -749,9 +748,6 @@ function initCharts(data) {
     
     // Initialize traffic control type chart
     updateTrafficControlChart(data);
-    
-    // Initialize motorcycle crashes by action chart
-    updateMotorcycleChart(data);
 }
 
 // Update all charts with filtered data
@@ -764,94 +760,6 @@ function updateCharts(data) {
     updateMetricsTrendChart(data);
     updatePedestrianActionChart(data);
     updateTrafficControlChart(data);
-    updateMotorcycleChart(data);
-}
-
-// Update motorcycle crashes by action chart
-function updateMotorcycleChart(data) {
-    const ctx = document.getElementById('motorcycleChart').getContext('2d');
-    
-    // Filter motorcycle data
-    const motorcycleData = data.filter(crash => crash.crash_type === 'motorcycle');
-    
-    // Count crashes by motorcycle action category
-    const actionCounts = {};
-    motorcycleData.forEach(crash => {
-        let action = crash.motorcycle_action || 'Unknown';
-        actionCounts[action] = (actionCounts[action] || 0) + 1;
-    });
-    
-    // Sort by count (descending) and take top 5 types, group others
-    const sortedActions = Object.keys(actionCounts)
-        .sort((a, b) => actionCounts[b] - actionCounts[a]);
-    
-    let labels = [];
-    let counts = [];
-    let colors = ['#3388FF', '#FF5533', '#33CC99', '#FF9900', '#9966CC', '#6699CC', '#FF6699'];
-    
-    if (sortedActions.length <= 7) {
-        labels = sortedActions;
-        counts = labels.map(action => actionCounts[action]);
-    } else {
-        // Take top 6 and group others
-        labels = sortedActions.slice(0, 6);
-        counts = labels.map(action => actionCounts[action]);
-        
-        // Sum the rest as "Other"
-        const otherSum = sortedActions.slice(6).reduce((sum, action) => sum + actionCounts[action], 0);
-        labels.push('Other');
-        counts.push(otherSum);
-        colors.push('#999999');
-    }
-    
-    // Destroy previous chart if it exists
-    if (charts.motorcycle) {
-        charts.motorcycle.destroy();
-    }
-    
-    // Create new chart
-    charts.motorcycle = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: counts,
-                backgroundColor: colors
-            }]
-        },
-        options: {
-            ...commonChartOptions,
-            plugins: {
-                ...commonChartOptions.plugins,
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 9
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Motorcycle Crashes by Action',
-                    font: {
-                        size: 11
-                    }
-                }
-            }
-        }
-    });
 }
 
 // Update pedestrian crashes by year chart
@@ -1640,6 +1548,9 @@ async function initApp() {
         // Initialize charts with all data
         initCharts(crashData);
         
+        // Set up PDF download button
+        setupPdfDownload();
+        
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Error initializing application:', error);
@@ -1815,7 +1726,7 @@ function updateVisualizationWithData(filteredData) {
         console.log(`Total filtered data points: ${filteredData.length}`);
         
         if (filteredData.length === 0) {
-            statusDiv.innerHTML = '<p>No crashes found in the selected area</p>';
+            statusDiv.innerHTML = '<p>No crashes found in the selected corridor</p>';
             return;
         }
         
@@ -1831,7 +1742,7 @@ function updateVisualizationWithData(filteredData) {
         mapDrawn = true;
         
         // Update status message
-        statusDiv.innerHTML = `<p>Showing ${filteredData.length} crashes in selected area</p>`;
+        statusDiv.innerHTML = `<p>Showing ${filteredData.length} crashes in selected corridor</p>`;
         
         // Update counter displays
         updateCounterDisplay(filteredData);
@@ -1867,8 +1778,105 @@ function resetVisualization() {
     
     // Update status message
     const statusDiv = document.getElementById('status-message');
-    statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+    statusDiv.innerHTML = '<p>Click the square icon to draw a corridor</p>';
     
     // Hide counter box
     document.getElementById('counter-box').style.display = 'none';
+}
+
+// Set up PDF download functionality
+function setupPdfDownload() {
+    const downloadBtn = document.getElementById('download-pdf');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function() {
+            // Alert for now - PDF generation would need server-side implementation
+            alert('PDF generation would be implemented here. This would generate a clean PDF report of the current visualization state.');
+            
+            /* 
+            For a real implementation, we would:
+            1. Collect all the chart canvases
+            2. Use a library like jsPDF, html2pdf, or html2canvas
+            3. Generate a clean PDF with the charts and metrics
+            4. Trigger the download
+            
+            Example full implementation:
+            
+            import html2canvas from 'html2canvas';
+            import { jsPDF } from 'jspdf';
+            
+            // Collect all the charts
+            const charts = document.querySelectorAll('.chart-box');
+            const metrics = document.getElementById('metrics-dashboard');
+            
+            // Create a temporary container for the report
+            const reportContainer = document.createElement('div');
+            reportContainer.style.width = '8.5in';
+            reportContainer.style.background = 'white';
+            reportContainer.style.padding = '0.5in';
+            
+            // Add title and header
+            const header = document.createElement('div');
+            header.innerHTML = `
+                <h1>Virginia Transportation Corridor Analysis</h1>
+                <p>Report generated on ${new Date().toLocaleDateString()}</p>
+            `;
+            reportContainer.appendChild(header);
+            
+            // Capture metrics
+            html2canvas(metrics).then(canvas => {
+                const metricsImage = canvas.toDataURL('image/png');
+                const metricsSection = document.createElement('div');
+                metricsSection.innerHTML = `
+                    <h2>Key Metrics</h2>
+                    <img src="${metricsImage}" style="width: 100%;" />
+                `;
+                reportContainer.appendChild(metricsSection);
+                
+                // Capture charts
+                const captureAllCharts = Array.from(charts).map((chart, i) => {
+                    return html2canvas(chart).then(canvas => {
+                        return {
+                            title: chart.querySelector('h3').textContent,
+                            image: canvas.toDataURL('image/png'),
+                            index: i
+                        };
+                    });
+                });
+                
+                Promise.all(captureAllCharts).then(results => {
+                    // Sort results by original index
+                    results.sort((a, b) => a.index - b.index);
+                    
+                    // Add charts to report
+                    const chartsSection = document.createElement('div');
+                    chartsSection.innerHTML = `<h2>Analysis Charts</h2>`;
+                    
+                    results.forEach(result => {
+                        const chartDiv = document.createElement('div');
+                        chartDiv.style.marginBottom = '20px';
+                        chartDiv.innerHTML = `
+                            <h3>${result.title}</h3>
+                            <img src="${result.image}" style="width: 100%;" />
+                        `;
+                        chartsSection.appendChild(chartDiv);
+                    });
+                    
+                    reportContainer.appendChild(chartsSection);
+                    
+                    // Create the PDF
+                    const pdf = new jsPDF('p', 'pt', 'letter');
+                    
+                    // Add the report content to the document
+                    pdf.html(reportContainer, {
+                        callback: function(pdf) {
+                            pdf.save('virginia-corridor-analysis.pdf');
+                        },
+                        x: 0,
+                        y: 0
+                    });
+                });
+            });
+            */
+        });
+    }
 } 

@@ -24,9 +24,15 @@
 </head>
 <body>
     <header>
-        <h1>Virginia Crash Data Visualizer</h1>
-        <p>Draw a selection box on the map to visualize crash data in that area</p>
-        <a href="https://v-gpt.onrender.com/" target="_blank" id="va-data-gpt" class="gpt-link">Virginia Data Portal GPT</a>
+        <h1>Virginia Transportation Corridor Tool</h1>
+        <div class="header-description">
+            <p>Draw a corridor to analyze pedestrian trend data</p>
+            <span class="info-icon" title="This tool helps analyze pedestrian safety data along transportation corridors">?</span>
+        </div>
+        <div class="header-actions">
+            <button id="download-pdf" class="action-button">Download PDF</button>
+            <a href="https://v-gpt.onrender.com/" target="_blank" id="va-data-gpt" class="gpt-link">Virginia Data Portal GPT</a>
+        </div>
     </header>
     
     <div id="metrics-dashboard">
@@ -98,10 +104,6 @@
             <div class="chart-box">
                 <h3>Traffic Control Type</h3>
                 <canvas id="trafficControlChart"></canvas>
-            </div>
-            <div class="chart-box">
-                <h3>Motorcycle Crashes by Action</h3>
-                <canvas id="motorcycleChart"></canvas>
             </div>
         </div>
     </main>
