@@ -1097,22 +1097,17 @@ function updateSeverityChart(data) {
         }
     });
     
-    // Count injuries and fatalities
-    const totalInjuries = data.reduce((sum, crash) => sum + parseInt(crash.injuries || 0), 0);
-    const totalFatalities = data.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
-    
     // Find max counts for y-axis scaling
     const severityValues = Object.values(severityCounts);
     const maxSeverityCount = Math.max(...severityValues, 1);
-    const maxInjuryCount = Math.max(totalInjuries, totalFatalities, 1);
-    const maxYValue = Math.max(maxSeverityCount, maxInjuryCount);
+    const maxYValue = maxSeverityCount;
     
     // Destroy previous chart if it exists
     if (charts.severity) {
         charts.severity.destroy();
     }
     
-    // Create new chart (dual axis chart)
+    // Create new chart (bar chart only, no line)
     charts.severity = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1141,19 +1136,7 @@ function updateSeverityChart(data) {
                         'rgb(255, 99, 132)',
                         'rgb(201, 42, 42)'
                     ],
-                    borderWidth: 1,
-                    order: 1
-                },
-                {
-                    label: 'Injuries & Fatalities',
-                    data: [0, 0, 0, totalInjuries, totalFatalities],
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgb(54, 162, 235)',
-                    type: 'line',
-                    order: 0,
-                    pointStyle: 'circle',
-                    pointRadius: 8,
-                    pointHoverRadius: 10
+                    borderWidth: 1
                 }
             ]
         },
