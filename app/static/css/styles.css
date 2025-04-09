@@ -145,37 +145,6 @@ footer {
     margin-bottom: 5px;
 }
 
-.buffer-control {
-    position: absolute;
-    top: 50px;
-    right: 10px;
-    background-color: rgba(255, 255, 255, 0.9);
-    padding: 10px;
-    border-radius: 4px;
-    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-    display: none;
-}
-
-.buffer-control input {
-    width: 60px;
-    margin: 0 5px;
-}
-
-.buffer-control button {
-    background-color: #28a745;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: 5px;
-}
-
-.buffer-control button:hover {
-    background-color: #218838;
-}
-
 .counter-overlay {
     position: absolute;
     top: 20px;
@@ -212,7 +181,7 @@ footer {
     box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
 }
 
-.polygon-button {
+.rectangle-button {
     width: 32px;
     height: 32px;
     background: white;
@@ -226,11 +195,11 @@ footer {
     outline: none;
 }
 
-.polygon-button:hover {
+.rectangle-button:hover {
     background-color: #f4f4f4;
 }
 
-.polygon-button.active {
+.rectangle-button.active {
     background-color: #e6f2ff;
 }
 
@@ -244,8 +213,8 @@ footer {
     color: #333;
 }
 
-/* Active state for polygon button */
-.polygon-button.active .polygon-icon {
+/* Active state for rectangle button */
+.rectangle-button.active .polygon-icon {
     color: #0078FF;
 }
 
@@ -322,4 +291,48 @@ footer {
     .city-label {
         display: none;
     }
+}
+
+#selection-box-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+#selection-box {
+    position: absolute;
+    border: 2px solid #0078FF;
+    background-color: rgba(0, 120, 255, 0.1);
+    display: none;
+}
+
+.map-button {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background-color: white;
+    border: none;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    z-index: 10;
+}
+
+.map-button:hover {
+    background-color: #f4f4f4;
+}
+
+.map-button.active {
+    background-color: #e6f2ff;
+    color: #0078FF;
 } 

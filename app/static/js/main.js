@@ -29,121 +29,246 @@ async function fetchCrashData() {
 // Initialize the map with MapLibre GL JS
 function initMap() {
     // First check if the map container exists
-    const mapContainer = document.getElementById('map');
-    if (!mapContainer) {
+    if (!document.getElementById('map')) {
         console.error('Map container not found');
         return;
     }
-
-    // Create the map with a better basemap that includes streets
+    
+    // Virginia center coordinates
+    const vaCenter = [-78.6, 37.5];
+    const defaultZoom = 7;
+    
+    // Initialize the map
     map = new maplibregl.Map({
         container: 'map',
-        style: {
-            'version': 8,
-            'sources': {
-                'osm': {
-                    'type': 'raster',
-                    'tiles': [
-                        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                    ],
-                    'tileSize': 256,
-                    'attribution': '© OpenStreetMap Contributors'
-                }
-            },
-            'layers': [
-                {
-                    'id': 'osm',
-                    'type': 'raster',
-                    'source': 'osm',
-                    'minzoom': 0,
-                    'maxzoom': 19
-                }
-            ]
-        },
-        center: [-78.5, 37.8], // Center of Virginia
-        zoom: 7
+        style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+        center: vaCenter,
+        zoom: defaultZoom,
+        attributionControl: true
     });
-
-    // Add navigation controls
-    map.addControl(new maplibregl.NavigationControl(), 'top-left');
-
-    // Add scale control
-    map.addControl(new maplibregl.ScaleControl({
-        maxWidth: 100,
-        unit: 'imperial'
-    }), 'bottom-left');
-
-    // Once map is loaded, add additional layers
-    map.on('load', function() {
-        console.log('Map loaded, initializing layers and tools');
-        
-        // Add state boundaries
-        map.addSource('states', {
-            type: 'geojson',
-            data: 'https://docs.mapbox.com/mapbox-gl-js/assets/us_states.geojson'
-        });
-        
-        map.addLayer({
-            'id': 'state-boundaries',
-            'type': 'line',
-            'source': 'states',
-            'layout': {},
-            'paint': {
-                'line-color': '#444',
-                'line-width': 2,
-                'line-opacity': 0.5
-            }
-        });
-        
-        // Attempt to add a streets layer (for major roads)
-        try {
-            // Add major highways layer
-            map.addLayer({
-                'id': 'highways-highlight',
-                'type': 'line',
-                'source': 'osm',
-                'source-layer': 'transportation',
-                'layout': {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                },
-                'paint': {
-                    'line-color': '#f44336',
-                    'line-width': [
-                        'interpolate', ['linear'], ['zoom'],
-                        8, 0.5,
-                        10, 1.5,
-                        13, 4
-                    ],
-                    'line-opacity': 0.7
-                },
-                'filter': ['==', 'class', 'highway']
-            });
+    
+    // Add navigation control
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    
+    // Create a selection box container
+    const selectBoxContainer = document.createElement('div');
+    selectBoxContainer.id = 'selection-box-container';
+    selectBoxContainer.style.position = 'absolute';
+    selectBoxContainer.style.top = '0';
+    selectBoxContainer.style.left = '0';
+    selectBoxContainer.style.width = '100%';
+    selectBoxContainer.style.height = '100%';
+    selectBoxContainer.style.pointerEvents = 'none';
+    selectBoxContainer.style.zIndex = '5';
+    document.getElementById('map-container').appendChild(selectBoxContainer);
+    
+    // Create the selection box
+    const selectionBox = document.createElement('div');
+    selectionBox.id = 'selection-box';
+    selectionBox.style.position = 'absolute';
+    selectionBox.style.border = '2px solid #0078FF';
+    selectionBox.style.backgroundColor = 'rgba(0, 120, 255, 0.1)';
+    selectionBox.style.display = 'none';
+    selectBoxContainer.appendChild(selectionBox);
+    
+    // Create a button for enabling box selection
+    const boxButton = document.createElement('button');
+    boxButton.id = 'box-select-btn';
+    boxButton.className = 'map-button';
+    boxButton.innerHTML = '⬚';
+    boxButton.title = 'Draw selection box';
+    boxButton.style.position = 'absolute';
+    boxButton.style.top = '110px';
+    boxButton.style.right = '10px';
+    boxButton.style.width = '32px';
+    boxButton.style.height = '32px';
+    boxButton.style.backgroundColor = 'white';
+    boxButton.style.border = 'none';
+    boxButton.style.borderRadius = '4px';
+    boxButton.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.1)';
+    boxButton.style.cursor = 'pointer';
+    boxButton.style.textAlign = 'center';
+    boxButton.style.fontSize = '20px';
+    boxButton.style.fontWeight = 'bold';
+    boxButton.style.color = '#333';
+    boxButton.style.zIndex = '10';
+    document.getElementById('map-container').appendChild(boxButton);
+    
+    // Add status message
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'status-message';
+    statusDiv.className = 'map-overlay';
+    statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+    document.getElementById('map-container').appendChild(statusDiv);
+    
+    // Create counter box
+    const counterBox = document.createElement('div');
+    counterBox.id = 'counter-box';
+    counterBox.className = 'counter-overlay';
+    document.getElementById('map-container').appendChild(counterBox);
+    counterBox.style.display = 'none';
+    
+    // Set up selection box functionality
+    let isSelecting = false;
+    let startX, startY;
+    let mapCanvas = map.getCanvas();
+    
+    // Box selection mode
+    boxButton.addEventListener('click', function() {
+        if (isSelecting) {
+            // Turn off selection mode
+            isSelecting = false;
+            boxButton.style.backgroundColor = 'white';
+            boxButton.style.color = '#333';
+            mapCanvas.style.cursor = 'grab';
+            statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+        } else {
+            // Turn on selection mode
+            isSelecting = true;
+            boxButton.style.backgroundColor = '#e6f2ff';
+            boxButton.style.color = '#0078FF';
+            mapCanvas.style.cursor = 'crosshair';
+            statusDiv.innerHTML = '<p>Click and drag to draw a selection box</p>';
             
-            console.log('Added highways layer');
-        } catch (err) {
-            console.warn('Could not add detailed roads layer, using OSM basemap only:', err);
+            // Clear any existing selection
+            selectionBox.style.display = 'none';
+            resetVisualization();
+        }
+    });
+    
+    // Clear button functionality
+    const clearBtn = document.getElementById('clear-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            resetVisualization();
+            selectionBox.style.display = 'none';
+        });
+    }
+    
+    // Mouse events for box selection
+    mapCanvas.addEventListener('mousedown', function(e) {
+        if (!isSelecting) return;
+        
+        const rect = mapCanvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        
+        selectionBox.style.left = startX + 'px';
+        selectionBox.style.top = startY + 'px';
+        selectionBox.style.width = '0px';
+        selectionBox.style.height = '0px';
+        selectionBox.style.display = 'block';
+        
+        // Prevent map dragging during selection
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    mapCanvas.addEventListener('mousemove', function(e) {
+        if (!isSelecting || selectionBox.style.display === 'none') return;
+        
+        const rect = mapCanvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        
+        const left = Math.min(startX, currentX);
+        const top = Math.min(startY, currentY);
+        
+        selectionBox.style.left = left + 'px';
+        selectionBox.style.top = top + 'px';
+        selectionBox.style.width = width + 'px';
+        selectionBox.style.height = height + 'px';
+        
+        // Prevent map dragging during selection
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    mapCanvas.addEventListener('mouseup', function(e) {
+        if (!isSelecting || selectionBox.style.display === 'none') return;
+        
+        const rect = mapCanvas.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+        
+        // Verify we have a minimum size box
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
+        
+        if (width < 10 || height < 10) {
+            // Box too small, ignore
+            selectionBox.style.display = 'none';
+            return;
         }
         
-        // Add city labels for Virginia cities
+        // Get the bounds of the selection box
+        const sw = map.unproject([Math.min(startX, endX), Math.max(startY, endY)]);
+        const ne = map.unproject([Math.max(startX, endX), Math.min(startY, endY)]);
+        
+        // Create a bounding box for filtering
+        const boundingBox = [
+            sw.lng, sw.lat,
+            ne.lng, sw.lat,
+            ne.lng, ne.lat,
+            sw.lng, ne.lat,
+            sw.lng, sw.lat
+        ];
+        
+        // Create a polygon from the bounding box
+        const selectionPolygon = turf.polygon([[
+            [sw.lng, sw.lat],
+            [ne.lng, sw.lat],
+            [ne.lng, ne.lat],
+            [sw.lng, ne.lat],
+            [sw.lng, sw.lat]
+        ]]);
+        
+        // Filter data by the selection box
+        const filteredData = crashData.filter(crash => {
+            const point = turf.point([parseFloat(crash.longitude), parseFloat(crash.latitude)]);
+            return turf.booleanPointInPolygon(point, selectionPolygon);
+        });
+        
+        // Update visualization with the filtered data
+        updateVisualizationWithData(filteredData);
+        
+        // Exit selection mode
+        isSelecting = false;
+        boxButton.style.backgroundColor = 'white';
+        boxButton.style.color = '#333';
+        mapCanvas.style.cursor = 'grab';
+    });
+    
+    map.on('load', function() {
+        // Add some attribution
+        map.addControl(new maplibregl.AttributionControl({
+            compact: true
+        }));
+        
+        // Add scale control
+        map.addControl(new maplibregl.ScaleControl({
+            maxWidth: 150,
+            unit: 'imperial'
+        }), 'bottom-left');
+        
+        // Add fullscreen control
+        map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+        
+        // Define Virginia cities for reference
         const virginiaCities = [
-            { name: "Richmond", coordinates: [-77.4360, 37.5407] },
-            { name: "Virginia Beach", coordinates: [-76.0581, 36.8529] },
-            { name: "Norfolk", coordinates: [-76.2859, 36.8508] },
-            { name: "Chesapeake", coordinates: [-76.2575, 36.7682] },
-            { name: "Arlington", coordinates: [-77.1003, 38.8816] },
-            { name: "Alexandria", coordinates: [-77.0469, 38.8048] },
-            { name: "Roanoke", coordinates: [-79.9414, 37.2710] },
-            { name: "Charlottesville", coordinates: [-78.4767, 38.0293] },
-            { name: "Lynchburg", coordinates: [-79.1422, 37.4138] },
-            { name: "Newport News", coordinates: [-76.4343, 37.0871] },
-            { name: "Hampton", coordinates: [-76.3452, 37.0299] },
-            { name: "Blacksburg", coordinates: [-80.4139, 37.2296] },
-            { name: "Danville", coordinates: [-79.3950, 36.5859] },
-            { name: "Fredericksburg", coordinates: [-77.4605, 38.3032] },
-            { name: "Manassas", coordinates: [-77.4753, 38.7509] }
+            { name: 'Richmond', coordinates: [-77.4360, 37.5407] },
+            { name: 'Norfolk', coordinates: [-76.2122, 36.8508] },
+            { name: 'Virginia Beach', coordinates: [-75.9774, 36.8529] },
+            { name: 'Roanoke', coordinates: [-79.9414, 37.2710] },
+            { name: 'Arlington', coordinates: [-77.1011, 38.8816] },
+            { name: 'Alexandria', coordinates: [-77.0469, 38.8048] },
+            { name: 'Charlottesville', coordinates: [-78.4767, 38.0293] },
+            { name: 'Lynchburg', coordinates: [-79.1422, 37.4138] },
+            { name: 'Blacksburg', coordinates: [-80.4139, 37.2296] },
+            { name: 'Bristol', coordinates: [-82.1887, 36.5961] }
         ];
         
         // Add city names
@@ -178,8 +303,7 @@ function initMap() {
             .addTo(map);
         });
         
-        // Initialize drawing tools and add crash data
-        initDrawingTools();
+        // Add crash data to map
         addCrashDataToMap();
     });
 }
@@ -190,80 +314,93 @@ function initDrawingTools() {
     try {
         console.log('Initializing drawing tools');
         
-        // Check if drawing modes are available
-        if (typeof window.SimplePolygonMode !== 'function') {
-            console.error('SimplePolygonMode not found. Make sure quadpoly.js is loaded first.');
-            return;
-        }
-        
-        // Create custom modes
-        const customModes = Object.assign({}, MapboxDraw.modes);
-        customModes.draw_polygon = SimplePolygonMode;
-        
-        // Initialize draw with custom modes
+        // Initialize draw with the rectangle tool enabled
         draw = new MapboxDraw({
             displayControlsDefault: false,
             controls: {
-                polygon: false,  // Disable standard polygon
-                line_string: true,
-                trash: true
+                polygon: false,
+                point: false,
+                line_string: false,
+                trash: true,
+                combine_features: false,
+                uncombine_features: false
             },
-            modes: customModes
+            // Only enable rectangle mode to simplify the user experience
+            defaultMode: 'draw_rectangle'
         });
 
         // Add the draw control to the map
         map.addControl(draw, 'top-right');
         console.log('Drawing tools initialized');
         
-        // Create custom control for Polygon drawing
-        const polygonControl = document.createElement('div');
-        polygonControl.className = 'maplibregl-ctrl-group maplibregl-ctrl polygon-control';
-        polygonControl.innerHTML = `
-            <button class="mapbox-gl-draw_ctrl-draw-btn polygon-button" title="Draw Polygon">
+        // Create custom control for rectangle drawing
+        const rectangleControl = document.createElement('div');
+        rectangleControl.className = 'maplibregl-ctrl-group maplibregl-ctrl polygon-control';
+        rectangleControl.innerHTML = `
+            <button class="mapbox-gl-draw_ctrl-draw-btn rectangle-button" title="Draw Rectangle">
                 <span class="polygon-icon">⬚</span>
             </button>
         `;
         
         // Add the custom control to the map container
-        document.getElementById('map-container').appendChild(polygonControl);
+        document.getElementById('map-container').appendChild(rectangleControl);
         
-        // Add event listener for the polygon mode button
-        const polygonButton = polygonControl.querySelector('.polygon-button');
-        polygonButton.addEventListener('click', function() {
-            console.log('Polygon button clicked');
-            // Add active class to button
-            polygonButton.classList.add('active');
+        // Add event listener for the rectangle mode button
+        const rectangleButton = rectangleControl.querySelector('.rectangle-button');
+        rectangleButton.addEventListener('click', function() {
+            console.log('Rectangle button clicked');
             
-            // Start polygon drawing mode
+            // Add active class to button
+            rectangleButton.classList.add('active');
+            
+            // First try to delete any existing drawings
             try {
-                draw.changeMode('draw_polygon');
-                console.log('Changed to polygon draw mode');
+                draw.deleteAll();
+                // Reset opacity of layers
+                map.setPaintProperty('vehicle-crashes', 'circle-opacity', 0.8);
+                map.setPaintProperty('pedestrian-crashes', 'circle-opacity', 0.8);
             } catch (err) {
-                console.error('Error changing to polygon mode:', err);
+                console.warn('Nothing to delete:', err);
+            }
+            
+            // Start rectangle drawing mode
+            try {
+                console.log('Changing to rectangle mode...');
+                draw.changeMode('draw_rectangle');
+                console.log('Changed to rectangle mode successfully');
+                
+                // Update status message
+                const statusDiv = document.getElementById('status-message');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<p>Click and drag to draw a rectangle area</p>';
+                }
+            } catch (err) {
+                console.error('Error changing to rectangle mode:', err);
+                alert('Error starting rectangle mode. See console for details.');
             }
         });
         
         // Set up event handlers for drawing
         map.on('draw.create', function(e) {
-            console.log('Draw create event triggered');
-            polygonButton.classList.remove('active');
+            console.log('Draw create event triggered', e);
+            rectangleButton.classList.remove('active');
             handleDrawEvent(e);
         });
         
         map.on('draw.update', function(e) {
-            console.log('Draw update event triggered');
+            console.log('Draw update event triggered', e);
             handleDrawEvent(e);
         });
         
         map.on('draw.delete', function(e) {
-            console.log('Draw delete event triggered');
+            console.log('Draw delete event triggered', e);
             clearVisualization();
         });
         
         map.on('draw.modechange', function(e) {
             console.log('Draw mode changed:', e.mode);
-            if (e.mode !== 'draw_polygon') {
-                polygonButton.classList.remove('active');
+            if (e.mode !== 'draw_rectangle') {
+                rectangleButton.classList.remove('active');
             }
         });
         
@@ -271,23 +408,8 @@ function initDrawingTools() {
         const statusDiv = document.createElement('div');
         statusDiv.id = 'status-message';
         statusDiv.className = 'map-overlay';
-        statusDiv.innerHTML = '<p>Click the square icon to draw a polygon</p>';
+        statusDiv.innerHTML = '<p>Click the square icon to draw a rectangle</p>';
         document.getElementById('map-container').appendChild(statusDiv);
-        
-        // Add buffer control for corridors
-        const bufferControlDiv = document.createElement('div');
-        bufferControlDiv.className = 'buffer-control';
-        bufferControlDiv.innerHTML = `
-            <div>
-                <label for="buffer-distance">Buffer distance (km): </label>
-                <input type="number" id="buffer-distance" value="0.5" min="0.1" max="5" step="0.1">
-                <button id="create-buffer">Create Buffer</button>
-            </div>
-        `;
-        document.getElementById('map-container').appendChild(bufferControlDiv);
-        
-        // Add event listener for buffer creation
-        document.getElementById('create-buffer').addEventListener('click', createCorridorBuffer);
         
         // Create counter box
         const counterBox = document.createElement('div');
@@ -304,47 +426,40 @@ function initDrawingTools() {
 // Handler for draw events
 function handleDrawEvent(e) {
     console.log('Draw event triggered:', e.type);
-    updateVisualization();
-}
-
-// Create a buffer around a line to form a corridor
-function createCorridorBuffer() {
+    
+    // If there's a feature, show it clearly on the map for better visibility
     try {
-        const features = draw.getSelected();
-        if (features.features.length === 0) {
-            alert('Please select a line first');
-            return;
+        const features = draw.getAll();
+        if (features.features.length > 0) {
+            // Highlight the drawing
+            if (!map.getSource('current-drawing')) {
+                map.addSource('current-drawing', {
+                    type: 'geojson',
+                    data: features
+                });
+            } else {
+                map.getSource('current-drawing').setData(features);
+            }
+            
+            // Add a visible outline if it doesn't exist
+            if (!map.getLayer('drawing-outline')) {
+                map.addLayer({
+                    id: 'drawing-outline',
+                    type: 'line',
+                    source: 'current-drawing',
+                    paint: {
+                        'line-color': '#ffcc00',
+                        'line-width': 3,
+                        'line-opacity': 0.9
+                    }
+                });
+            }
         }
-        
-        const selectedFeature = features.features[0];
-        if (selectedFeature.geometry.type !== 'LineString') {
-            alert('Please select a line to create a corridor');
-            return;
-        }
-        
-        // Get buffer distance from input (convert km to meters)
-        const bufferDistance = parseFloat(document.getElementById('buffer-distance').value) || 0.5;
-        
-        // Create a buffer around the line
-        const buffered = turf.buffer(selectedFeature, bufferDistance, {units: 'kilometers'});
-        
-        // Remove the line
-        draw.delete(selectedFeature.id);
-        
-        // Add the buffer as a polygon
-        draw.add(buffered);
-        
-        // Update visualization with the new polygon
-        updateVisualization();
-        
-        console.log(`Created corridor with ${bufferDistance}km buffer`);
-        
-        // Update status message
-        const statusDiv = document.getElementById('status-message');
-        statusDiv.innerHTML = `<p>Corridor created with ${bufferDistance}km buffer</p>`;
     } catch (error) {
-        console.error('Error creating corridor buffer:', error);
+        console.warn('Error highlighting drawing:', error);
     }
+    
+    updateVisualization();
 }
 
 // Add crash data as points on the map
@@ -484,7 +599,7 @@ function updateVisualization() {
         shapesFeatures.forEach(shape => {
             console.log(`Processing shape of type: ${shape.geometry.type}`);
             
-            // Handle different geometry types
+            // Handle different geometry types - only polygon/rectangle is supported now
             if (shape.geometry.type === 'Polygon') {
                 // For polygons, check points inside
                 const pointsInPolygon = crashData.filter(crash => {
@@ -497,24 +612,8 @@ function updateVisualization() {
                     }
                 });
                 
-                console.log(`Found ${pointsInPolygon.length} points in polygon`);
+                console.log(`Found ${pointsInPolygon.length} points in rectangle`);
                 filteredData = [...filteredData, ...pointsInPolygon];
-            } else if (shape.geometry.type === 'LineString') {
-                // For lines, buffer them to create a corridor and check points inside
-                try {
-                    const bufferDistance = parseFloat(document.getElementById('buffer-distance').value) || 0.5;
-                    const buffered = turf.buffer(shape, bufferDistance, {units: 'kilometers'});
-                    
-                    const pointsNearLine = crashData.filter(crash => {
-                        const point = turf.point([parseFloat(crash.longitude), parseFloat(crash.latitude)]);
-                        return turf.booleanPointInPolygon(point, buffered);
-                    });
-                    
-                    console.log(`Found ${pointsNearLine.length} points near line (${bufferDistance}km buffer)`);
-                    filteredData = [...filteredData, ...pointsNearLine];
-                } catch (err) {
-                    console.error('Error processing line buffer:', err);
-                }
             }
         });
         
@@ -556,7 +655,7 @@ function updateVisualization() {
 // Make updateVisualization available globally for the custom draw mode
 window.updateVisualization = updateVisualization;
 
-// Clear visualization when polygon is deleted
+// Clear visualization when rectangle is deleted
 function clearVisualization() {
     if (!mapDrawn) return;
     
@@ -576,10 +675,7 @@ function clearVisualization() {
     
     // Update status message
     const statusDiv = document.getElementById('status-message');
-    statusDiv.innerHTML = '<p>Draw a polygon or corridor to filter crash data</p>';
-    
-    // Hide buffer controls
-    document.querySelector('.buffer-control').style.display = 'none';
+    statusDiv.innerHTML = '<p>Click the square icon to draw a rectangle</p>';
     
     // Hide counter box
     document.getElementById('counter-box').style.display = 'none';
@@ -956,20 +1052,30 @@ function updateSelectedCrashesLayer(filteredData) {
     });
 }
 
-// Update the counter display
+// Update counter display with crash statistics
 function updateCounterDisplay(filteredData) {
+    // Get the counter box
+    const counterBox = document.getElementById('counter-box');
+    if (!counterBox) return;
+    
+    // Count by type
     const pedestrianCount = filteredData.filter(crash => crash.crash_type === 'pedestrian').length;
     const vehicleCount = filteredData.filter(crash => crash.crash_type === 'vehicle').length;
     
-    const counterBox = document.getElementById('counter-box');
-    if (counterBox) {
-        counterBox.innerHTML = `
-            <div>Total crashes: <strong>${filteredData.length}</strong></div>
-            <div>Pedestrian: <strong>${pedestrianCount}</strong></div>
-            <div>Vehicle: <strong>${vehicleCount}</strong></div>
-        `;
-        counterBox.style.display = 'flex';
-    }
+    // Count injuries and fatalities
+    const injuries = filteredData.reduce((sum, crash) => sum + parseInt(crash.injuries || 0), 0);
+    const fatalities = filteredData.reduce((sum, crash) => sum + parseInt(crash.fatalities || 0), 0);
+    
+    // Update the counter box with HTML content
+    counterBox.innerHTML = `
+        <div><strong>Pedestrian Crashes:</strong> ${pedestrianCount}</div>
+        <div><strong>Vehicle Crashes:</strong> ${vehicleCount}</div>
+        <div><strong>Total Injuries:</strong> ${injuries}</div>
+        <div><strong>Total Fatalities:</strong> ${fatalities}</div>
+    `;
+    
+    // Show the counter box
+    counterBox.style.display = 'flex';
 }
 
 // Set up popups for crash points
@@ -1038,4 +1144,69 @@ function showPopup(e, popup, isSelected = false) {
 function removePopup(popup) {
     map.getCanvas().style.cursor = '';
     popup.remove();
+}
+
+// Update visualizations with filtered data
+function updateVisualizationWithData(filteredData) {
+    try {
+        console.log('Updating visualization with filtered data');
+        
+        // Update status message
+        const statusDiv = document.getElementById('status-message');
+        
+        console.log(`Total filtered data points: ${filteredData.length}`);
+        
+        if (filteredData.length === 0) {
+            statusDiv.innerHTML = '<p>No crashes found in the selected area</p>';
+            return;
+        }
+        
+        // Update the selected crashes layer
+        updateSelectedCrashesLayer(filteredData);
+        
+        // Reduce opacity of unselected crashes
+        map.setPaintProperty('vehicle-crashes', 'circle-opacity', 0.2);
+        map.setPaintProperty('pedestrian-crashes', 'circle-opacity', 0.2);
+
+        // Update charts with filtered data
+        updateCharts(filteredData);
+        mapDrawn = true;
+        
+        // Update status message
+        statusDiv.innerHTML = `<p>Showing ${filteredData.length} crashes in selected area</p>`;
+        
+        // Update counter displays
+        updateCounterDisplay(filteredData);
+        
+    } catch (error) {
+        console.error('Error updating visualization:', error);
+        const statusDiv = document.getElementById('status-message');
+        statusDiv.innerHTML = '<p>Error processing selection. Try again.</p>';
+    }
+}
+
+// Reset visualization to show all data
+function resetVisualization() {
+    if (!mapDrawn) return;
+    
+    // Reset map layers
+    map.setPaintProperty('vehicle-crashes', 'circle-opacity', 0.8);
+    map.setPaintProperty('pedestrian-crashes', 'circle-opacity', 0.8);
+    
+    // Clear selected crashes
+    map.getSource('selected-crashes').setData({
+        type: 'FeatureCollection',
+        features: []
+    });
+    
+    // Reset charts
+    initCharts(crashData);
+    mapDrawn = false;
+    
+    // Update status message
+    const statusDiv = document.getElementById('status-message');
+    statusDiv.innerHTML = '<p>Click the square icon to draw a selection box</p>';
+    
+    // Hide counter box
+    document.getElementById('counter-box').style.display = 'none';
 } 
